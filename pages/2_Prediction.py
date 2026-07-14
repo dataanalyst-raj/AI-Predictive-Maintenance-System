@@ -1,16 +1,33 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import pyodbc
 
 # -------------------------
-# Load Model
+# Page Title
+# -------------------------
+st.title("🤖 Machine Failure Prediction")
+
+# -------------------------
+# Load Trained Model
 # -------------------------
 model = joblib.load("xgboost_predictive_maintenance.pkl")
 
-st.title("🤖 Machine Failure Prediction")
-st.markdown("---")
+# -------------------------
+# SQL Server Connection
+# -------------------------
+conn = pyodbc.connect(
+    "DRIVER={ODBC Driver 17 for SQL Server};"
+    "SERVER=DESKTOP-JS0I57G\\SQLEXPRESS;"
+    "DATABASE=PredictiveMaintenance;"
+    "Trusted_Connection=yes;"
+)
 
-# Two-column layout
+cursor = conn.cursor()
+
+# -------------------------
+# Input Layout
+# -------------------------
 col1, col2 = st.columns(2)
 
 with col1:
@@ -49,13 +66,19 @@ with col2:
 
 st.markdown("---")
 
+# -------------------------
+# Prediction Button
+# -------------------------
 if st.button("🔍 Predict"):
 
+    # Feature Engineering
     temp_difference = process_temp - air_temp
 
+    # One-Hot Encoding
     type_l = 1 if machine_type == "L" else 0
     type_m = 1 if machine_type == "M" else 0
 
+    # Input Data
     input_df = pd.DataFrame([{
         "Air_temperature_K": air_temp,
         "Process_temperature_K": process_temp,
@@ -67,36 +90,48 @@ if st.button("🔍 Predict"):
         "Type_M": type_m
     }])
 
+    # Prediction
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
-    failure = "Failure" if prediction == 1 else "Healthy"
 
-cursor.execute("""
-INSERT INTO PredictionHistory
-(
-MachineType,
-AirTemperature,
-ProcessTemperature,
-RotationalSpeed,
-Torque,
-ToolWear,
-FailurePrediction,
-FailureProbability
-)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-""",
-machine_type,
-air_temp,
-process_temp,
-rot_speed,
-torque,
-tool_wear,
-failure,
-float(probability)
-)
+    # Convert Prediction to Text
+    if prediction == 1:
+        failure = "Failure"
+    else:
+        failure = "Healthy"
 
-conn.commit()
+    # -------------------------
+    # Save to SQL Server
+    # -------------------------
+    cursor.execute("""
+    INSERT INTO PredictionHistory
+    (
+        MachineType,
+        AirTemperature,
+        ProcessTemperature,
+        RotationalSpeed,
+        Torque,
+        ToolWear,
+        FailurePrediction,
+        FailureProbability
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    machine_type,
+    air_temp,
+    process_temp,
+    rot_speed,
+    torque,
+    tool_wear,
+    failure,
+    float(probability)
+    )
 
+    conn.commit()
+
+    # -------------------------
+    # Display Results
+    # -------------------------
     st.markdown("## Prediction Result")
 
     if prediction == 1:
@@ -104,11 +139,13 @@ conn.commit()
     else:
         st.success("✅ Machine is Healthy")
 
+    st.success("💾 Prediction saved to SQL Server successfully!")
+
     st.progress(float(probability))
 
     st.metric(
         "Failure Probability",
-        f"{probability*100:.2f}%"
+        f"{probability * 100:.2f}%"
     )
 
     st.subheader("Input Summary")
