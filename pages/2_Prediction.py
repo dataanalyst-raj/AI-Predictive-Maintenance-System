@@ -2,63 +2,60 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# ----------------------------
+# -------------------------
 # Load Model
-# ----------------------------
+# -------------------------
 model = joblib.load("xgboost_predictive_maintenance.pkl")
 
 st.title("🤖 Machine Failure Prediction")
+st.markdown("---")
 
-st.write("Enter the machine parameters below.")
+# Two-column layout
+col1, col2 = st.columns(2)
+
+with col1:
+
+    machine_type = st.selectbox(
+        "Machine Type",
+        ["L", "M", "H"]
+    )
+
+    air_temp = st.number_input(
+        "Air Temperature (K)",
+        value=300.0
+    )
+
+    process_temp = st.number_input(
+        "Process Temperature (K)",
+        value=310.0
+    )
+
+with col2:
+
+    rot_speed = st.number_input(
+        "Rotational Speed (RPM)",
+        value=1500
+    )
+
+    torque = st.number_input(
+        "Torque (Nm)",
+        value=40.0
+    )
+
+    tool_wear = st.number_input(
+        "Tool Wear (min)",
+        value=10
+    )
 
 st.markdown("---")
 
-# =============================
-# USER INPUTS
-# =============================
+if st.button("🔍 Predict"):
 
-machine_type = st.selectbox(
-    "Machine Type",
-    ["L", "M", "H"]
-)
-
-air_temp = st.number_input(
-    "Air Temperature (K)",
-    value=300.0
-)
-
-process_temp = st.number_input(
-    "Process Temperature (K)",
-    value=310.0
-)
-
-rot_speed = st.number_input(
-    "Rotational Speed (RPM)",
-    value=1500
-)
-
-torque = st.number_input(
-    "Torque (Nm)",
-    value=40.0
-)
-
-tool_wear = st.number_input(
-    "Tool Wear (min)",
-    value=10
-)
-
-st.markdown("---")
-
-if st.button("Predict Machine Failure"):
-
-    # Feature Engineering
     temp_difference = process_temp - air_temp
 
-    # One-Hot Encoding
     type_l = 1 if machine_type == "L" else 0
     type_m = 1 if machine_type == "M" else 0
 
-    # Create Input DataFrame
     input_df = pd.DataFrame([{
         "Air_temperature_K": air_temp,
         "Process_temperature_K": process_temp,
@@ -80,11 +77,13 @@ if st.button("Predict Machine Failure"):
     else:
         st.success("✅ Machine is Healthy")
 
+    st.progress(float(probability))
+
     st.metric(
         "Failure Probability",
         f"{probability*100:.2f}%"
     )
 
-    st.markdown("### Input Summary")
+    st.subheader("Input Summary")
 
-    st.dataframe(input_df)
+    st.dataframe(input_df, use_container_width=True)
