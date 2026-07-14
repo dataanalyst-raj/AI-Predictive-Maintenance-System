@@ -69,6 +69,33 @@ if st.button("🔍 Predict"):
 
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
+    failure = "Failure" if prediction == 1 else "Healthy"
+
+cursor.execute("""
+INSERT INTO PredictionHistory
+(
+MachineType,
+AirTemperature,
+ProcessTemperature,
+RotationalSpeed,
+Torque,
+ToolWear,
+FailurePrediction,
+FailureProbability
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+""",
+machine_type,
+air_temp,
+process_temp,
+rot_speed,
+torque,
+tool_wear,
+failure,
+float(probability)
+)
+
+conn.commit()
 
     st.markdown("## Prediction Result")
 
