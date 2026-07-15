@@ -1,153 +1,211 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import pyodbc
+from database import save_prediction
 
-# -------------------------
-# Page Title
-# -------------------------
-st.title("🤖 Machine Failure Prediction")
+# -----------------------
+# Load Model
+# -----------------------
 
-# -------------------------
-# Load Trained Model
-# -------------------------
 model = joblib.load("xgboost_predictive_maintenance.pkl")
 
-# -------------------------
-# SQL Server Connection
-# -------------------------
-conn = pyodbc.connect(
-    "DRIVER={ODBC Driver 17 for SQL Server};"
-    "SERVER=DESKTOP-JS0I57G\\SQLEXPRESS;"
-    "DATABASE=PredictiveMaintenance;"
-    "Trusted_Connection=yes;"
+# -----------------------
+# Page Title
+# -----------------------
+
+st.title("🤖 Machine Failure Prediction")
+
+st.write("Enter the machine parameters below.")
+
+# -----------------------
+# User Inputs
+# -----------------------
+
+machine_type = st.selectbox(
+    "Machine Type",
+    ["L", "M", "H"]
 )
 
-cursor = conn.cursor()
+air_temp = st.number_input(
+    "Air Temperature (K)",
+    value=300.0
+)
 
-# -------------------------
-# Input Layout
-# -------------------------
-col1, col2 = st.columns(2)
+process_temp = st.number_input(
+    "Process Temperature (K)",
+    value=310.0
+)
 
-with col1:
+rot_speed = st.number_input(
+    "Rotational Speed (rpm)",
+    value=1500
+)
 
-    machine_type = st.selectbox(
-        "Machine Type",
-        ["L", "M", "H"]
-    )
+torque = st.number_input(
+    "Torque (Nm)",
+    value=40.0
+)
 
-    air_temp = st.number_input(
-        "Air Temperature (K)",
-        value=300.0
-    )
+tool_wear = st.number_input(
+    "Tool Wear (min)",
+    value=10
+)
 
-    process_temp = st.number_input(
-        "Process Temperature (K)",
-        value=310.0
-    )
+# -----------------------
+# Feature Engineering
+# -----------------------
 
-with col2:
+temp_difference = process_temp - air_temp
 
-    rot_speed = st.number_input(
-        "Rotational Speed (RPM)",
-        value=1500
-    )
+st.info(f"Temperature Difference = {temp_difference:.2f} K")
 
-    torque = st.number_input(
-        "Torque (Nm)",
-        value=40.0
-    )
+# -----------------------
+# One-Hot Encoding
+# -----------------------
 
-    tool_wear = st.number_input(
-        "Tool Wear (min)",
-        value=10
-    )
+Type_L = 1 if machine_type == "L" else 0
+Type_M = 1 if machine_type == "M" else 0
 
-st.markdown("---")
-
-# -------------------------
+# -----------------------
 # Prediction Button
-# -------------------------
-if st.button("🔍 Predict"):
+# -----------------------
 
-    # Feature Engineering
-    temp_difference = process_temp - air_temp
+if st.button("Predict Machine Failure"):
 
-    # One-Hot Encoding
-    type_l = 1 if machine_type == "L" else 0
-    type_m = 1 if machine_type == "M" else 0
+    input_data = pd.DataFrame([[
+        air_temp,
+        process_temp,
+        rot_speed,
+        torque,
+        tool_wear,
+        temp_difference,
+        Type_L,
+        Type_M
+    ]], columns=[
+        "Air_temperature_K",
+        "Process_temperature_K",
+        "Rotational_speed_rpm",
+        "Torque_Nm",
+        "Tool_wear_min",
+        "Temperature_Difference",
+        "Type_L",
+        "Type_M"
+    ])
 
-    # Input Data
-    input_df = pd.DataFrame([{
-        "Air_temperature_K": air_temp,
-        "Process_temperature_K": process_temp,
-        "Rotational_speed_rpm": rot_speed,
-        "Torque_Nm": torque,
-        "Tool_wear_min": tool_wear,
-        "Temperature_Difference": temp_difference,
-        "Type_L": type_l,
-        "Type_M": type_m
-    }])
+    prediction = model.predict(input_data)[0]
 
-    # Prediction
-    prediction = model.predict(input_df)[0]
-    probability = model.predict_proba(input_df)[0][1]
+    probability = model.predict_proba(input_data)[0]
 
-    # Convert Prediction to Text
-    if prediction == 1:
-        failure = "Failure"
-    else:
-        failure = "Healthy"
+    confidence = float(max(probability) * 100)
 
-    # -------------------------
-    # Save to SQL Server
-    # -------------------------
-    cursor.execute("""
-    INSERT INTO PredictionHistory
-    (
-        MachineType,
-        AirTemperature,
-        ProcessTemperature,
-        RotationalSpeed,
-        Torque,
-        ToolWear,
-        FailurePrediction,
-        FailureProbability
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-    machine_type,
-    air_temp,
-    process_temp,
-    rot_speed,
-    torque,
-    tool_wear,
-    failure,
-    float(probability)
-    )
+    st.markdown("---")
 
-    conn.commit()
+    # -----------------------
+    # Prediction Result
+    # -----------------------
 
-    # -------------------------
-    # Display Results
-    # -------------------------
-    st.markdown("## Prediction Result")
+    if prediction == 0:
 
-    if prediction == 1:
-        st.error("⚠️ Machine Failure Predicted")
-    else:
+        prediction_text = "Healthy"
+
         st.success("✅ Machine is Healthy")
 
-    st.success("💾 Prediction saved to SQL Server successfully!")
+    else:
 
-    st.progress(float(probability))
+        prediction_text = "Failure"
+
+        st.error("⚠️ Machine Failure Predicted")
 
     st.metric(
-        "Failure Probability",
-        f"{probability * 100:.2f}%"
+        "Prediction Confidence",
+        f"{confidence:.2f}%"
     )
 
-    st.subheader("Input Summary")
+    # -----------------------
+    # Explainable AI
+    # -----------------------
 
-    st.dataframe(input_df, use_container_width=True)
+    reasons = []
+
+    # Tool Wear
+    if tool_wear > 150:
+        reasons.append("🔴 Tool Wear is extremely high")
+
+    elif tool_wear > 100:
+        reasons.append("🟠 Tool Wear is high")
+
+    else:
+        reasons.append("🟢 Tool Wear is normal")
+
+    # Torque
+    if torque > 60:
+        reasons.append("🔴 Torque is very high")
+
+    elif torque > 45:
+        reasons.append("🟠 Torque is above normal")
+
+    else:
+        reasons.append("🟢 Torque is normal")
+
+    # Temperature Difference
+    if temp_difference > 15:
+        reasons.append("🔴 Temperature Difference is very high")
+
+    elif temp_difference > 10:
+        reasons.append("🟠 Temperature Difference is elevated")
+
+    else:
+        reasons.append("🟢 Temperature Difference is normal")
+
+    # Rotational Speed
+    if rot_speed < 1200:
+        reasons.append("🟠 Rotational Speed is low")
+
+    elif rot_speed > 1800:
+        reasons.append("🟠 Rotational Speed is high")
+
+    else:
+        reasons.append("🟢 Rotational Speed is normal")
+
+    # -----------------------
+    # AI Explanation
+    # -----------------------
+
+    st.markdown("---")
+
+    st.subheader("🧠 AI Decision Explanation")
+
+    for reason in reasons:
+        st.write(reason)
+
+    # -----------------------
+    # Risk Level
+    # -----------------------
+
+    st.markdown("---")
+
+    if prediction == 0:
+
+        st.success("🟢 Overall Risk Level : LOW")
+
+    else:
+
+        st.error("🔴 Overall Risk Level : HIGH")
+
+    # -----------------------
+    # Save to SQL Server
+    # -----------------------
+
+    save_prediction(
+        machine_type,
+        air_temp,
+        process_temp,
+        rot_speed,
+        torque,
+        tool_wear,
+        temp_difference,
+        prediction_text,
+        confidence
+    )
+
+    st.success("✅ Prediction saved to SQL Server successfully!")
