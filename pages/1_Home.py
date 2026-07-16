@@ -1,3 +1,6 @@
+from styles import load_css
+
+load_css()
 import streamlit as st
 
 st.set_page_config(page_title="AI Predictive Maintenance", page_icon="🤖")
