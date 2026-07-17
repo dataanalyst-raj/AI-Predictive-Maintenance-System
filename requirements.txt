@@ -6,3 +6,5 @@ xgboost
 joblib
 plotly
 pyodbc
+shap
+reportlab
