@@ -2,14 +2,17 @@ import pyodbc
 import pandas as pd
 
 
-# ----------------------------------------------------
-# Database Connection
-# ----------------------------------------------------
+# ============================================================
+# SQL SERVER CONNECTION
+# ============================================================
 
 def get_connection():
     """
-    Create and return a SQL Server connection.
-    Returns None if SQL Server is unavailable.
+    Creates and returns a SQL Server connection.
+
+    Returns:
+        pyodbc.Connection if successful
+        None if SQL Server is unavailable
     """
 
     try:
@@ -22,13 +25,16 @@ def get_connection():
 
         return conn
 
-    except Exception:
+    except Exception as e:
+
+        print(f"Database Connection Error: {e}")
+
         return None
 
 
-# ----------------------------------------------------
-# Save Prediction
-# ----------------------------------------------------
+# ============================================================
+# SAVE PREDICTION
+# ============================================================
 
 def save_prediction(
     machine_type,
@@ -42,9 +48,11 @@ def save_prediction(
     confidence
 ):
     """
-    Save prediction results into SQL Server.
-    Returns True if saved successfully.
-    Returns False if SQL Server is unavailable.
+    Save prediction into SQL Server.
+
+    Returns:
+        True  -> Saved successfully
+        False -> Database unavailable
     """
 
     conn = get_connection()
@@ -52,9 +60,11 @@ def save_prediction(
     if conn is None:
         return False
 
-    cursor = conn.cursor()
+    try:
 
-    query = """
+        cursor = conn.cursor()
+
+        query = """
         INSERT INTO PredictionHistory
         (
             MachineType,
@@ -68,38 +78,49 @@ def save_prediction(
             Confidence
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """
+        """
 
-    values = (
-        str(machine_type),
-        float(air_temp),
-        float(process_temp),
-        float(rotational_speed),
-        float(torque),
-        float(tool_wear),
-        float(temp_difference),
-        str(prediction),
-        float(confidence)
-    )
+        values = (
+            str(machine_type),
+            float(air_temp),
+            float(process_temp),
+            float(rotational_speed),
+            float(torque),
+            float(tool_wear),
+            float(temp_difference),
+            str(prediction),
+            float(confidence)
+        )
 
-    cursor.execute(query, values)
+        cursor.execute(query, values)
 
-    conn.commit()
+        conn.commit()
 
-    cursor.close()
-    conn.close()
+        cursor.close()
 
-    return True
+        return True
+
+    except Exception as e:
+
+        print(f"Error Saving Prediction: {e}")
+
+        return False
+
+    finally:
+
+        conn.close()
 
 
-# ----------------------------------------------------
-# Get Prediction History
-# ----------------------------------------------------
+# ============================================================
+# GET PREDICTION HISTORY
+# ============================================================
 
 def get_prediction_history():
     """
-    Read all prediction history from SQL Server.
-    Returns an empty DataFrame if SQL Server is unavailable.
+    Returns prediction history.
+
+    If SQL Server is unavailable,
+    returns an empty DataFrame.
     """
 
     conn = get_connection()
@@ -107,14 +128,46 @@ def get_prediction_history():
     if conn is None:
         return pd.DataFrame()
 
-    query = """
+    try:
+
+        query = """
         SELECT *
         FROM PredictionHistory
         ORDER BY PredictionTime DESC
+        """
+
+        df = pd.read_sql(query, conn)
+
+        return df
+
+    except Exception as e:
+
+        print(f"Error Reading Database: {e}")
+
+        return pd.DataFrame()
+
+    finally:
+
+        conn.close()
+
+
+# ============================================================
+# DATABASE STATUS
+# ============================================================
+
+def database_available():
+    """
+    Checks whether SQL Server is available.
+
+    Returns:
+        True or False
     """
 
-    df = pd.read_sql(query, conn)
+    conn = get_connection()
+
+    if conn is None:
+        return False
 
     conn.close()
 
-    return df
+    return True
