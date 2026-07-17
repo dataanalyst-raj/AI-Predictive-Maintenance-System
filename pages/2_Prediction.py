@@ -7,6 +7,55 @@ import os
 
 from database import save_prediction
 
+st.set_page_config(page_title="Prediction", page_icon="🔮", layout="wide")
+
+# ---------------------------------
+# Shared Custom CSS (same as Home)
+# ---------------------------------
+st.markdown("""
+<style>
+    .hero-title {
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: #1a1a2e;
+        margin-bottom: 0.2rem;
+    }
+    .hero-subtitle {
+        font-size: 1.05rem;
+        color: #555;
+        margin-bottom: 1.5rem;
+    }
+    .card {
+        background-color: #f8f9fb;
+        border: 1px solid #e6e6e6;
+        border-radius: 12px;
+        padding: 1.2rem 1.4rem;
+        height: 100%;
+    }
+    .result-card-healthy {
+        background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        border-radius: 14px;
+        padding: 1.5rem;
+        color: white;
+        text-align: center;
+    }
+    .result-card-failure {
+        background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%);
+        border-radius: 14px;
+        padding: 1.5rem;
+        color: white;
+        text-align: center;
+    }
+    .metric-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 1rem;
+        color: white;
+        text-align: center;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ---------------------------------
 # Load Model
 # ---------------------------------
@@ -15,45 +64,34 @@ model = joblib.load("xgboost_predictive_maintenance.pkl")
 explainer = shap.TreeExplainer(model)
 
 # ---------------------------------
-# Page Title
+# Page Header
 # ---------------------------------
 
-st.title("🤖 Machine Failure Prediction")
-st.write("Enter the machine parameters below.")
+st.markdown('<div class="hero-title">🔮 Machine Failure Prediction</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-subtitle">Enter live machine parameters to get an instant AI-powered health prediction.</div>', unsafe_allow_html=True)
 
 # ---------------------------------
-# User Inputs
+# User Inputs (in a card, laid out in columns)
 # ---------------------------------
 
-machine_type = st.selectbox(
-    "Machine Type",
-    ["L", "M", "H"]
-)
+st.markdown("### ⚙️ Machine Parameters")
 
-air_temp = st.number_input(
-    "Air Temperature (K)",
-    value=300.0
-)
+with st.container():
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-process_temp = st.number_input(
-    "Process Temperature (K)",
-    value=310.0
-)
+    col1, col2 = st.columns(2)
 
-rot_speed = st.number_input(
-    "Rotational Speed (rpm)",
-    value=1500
-)
+    with col1:
+        machine_type = st.selectbox("Machine Type", ["L", "M", "H"])
+        air_temp = st.number_input("Air Temperature (K)", value=300.0)
+        process_temp = st.number_input("Process Temperature (K)", value=310.0)
 
-torque = st.number_input(
-    "Torque (Nm)",
-    value=40.0
-)
+    with col2:
+        rot_speed = st.number_input("Rotational Speed (rpm)", value=1500)
+        torque = st.number_input("Torque (Nm)", value=40.0)
+        tool_wear = st.number_input("Tool Wear (min)", value=10)
 
-tool_wear = st.number_input(
-    "Tool Wear (min)",
-    value=10
-)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------
 # Feature Engineering
@@ -61,7 +99,7 @@ tool_wear = st.number_input(
 
 temp_difference = process_temp - air_temp
 
-st.info(f"Temperature Difference = {temp_difference:.2f} K")
+st.info(f"🌡️ Temperature Difference = {temp_difference:.2f} K")
 
 # ---------------------------------
 # One Hot Encoding
@@ -74,7 +112,10 @@ Type_M = 1 if machine_type == "M" else 0
 # Prediction
 # ---------------------------------
 
-if st.button("Predict Machine Failure"):
+st.write("")
+predict_clicked = st.button("🚀 Predict Machine Failure", use_container_width=True)
+
+if predict_clicked:
 
     input_data = pd.DataFrame(
         [[
@@ -100,9 +141,7 @@ if st.button("Predict Machine Failure"):
     )
 
     prediction = model.predict(input_data)[0]
-
     probability = model.predict_proba(input_data)[0]
-
     confidence = float(max(probability) * 100)
 
     # ---------------------------------
@@ -117,44 +156,62 @@ if st.button("Predict Machine Failure"):
     })
 
     importance["Impact"] = importance["Contribution"].abs()
-
-    importance = importance.sort_values(
-        by="Impact",
-        ascending=False
-    )
-    # Top 5 SHAP Features
+    importance = importance.sort_values(by="Impact", ascending=False)
 
     top_features = importance["Feature"].head(5).tolist()
 
     # ---------------------------------
-    # Prediction Result
+    # Prediction Result (big styled card)
     # ---------------------------------
 
     st.markdown("---")
 
     if prediction == 0:
         prediction_text = "Healthy"
-        st.success("✅ Machine is Healthy")
+        result_col1, result_col2 = st.columns([2, 1])
+        with result_col1:
+            st.markdown(f"""
+            <div class="result-card-healthy">
+                <div style="font-size:2rem;">✅</div>
+                <div style="font-size:1.4rem; font-weight:700;">Machine is Healthy</div>
+                <div style="opacity:0.9;">No immediate action required</div>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         prediction_text = "Failure"
-        st.error("⚠️ Machine Failure Predicted")
+        result_col1, result_col2 = st.columns([2, 1])
+        with result_col1:
+            st.markdown(f"""
+            <div class="result-card-failure">
+                <div style="font-size:2rem;">⚠️</div>
+                <div style="font-size:1.4rem; font-weight:700;">Machine Failure Predicted</div>
+                <div style="opacity:0.9;">Immediate inspection recommended</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    st.metric(
-        "Prediction Confidence",
-        f"{confidence:.2f}%"
-    )
+    with result_col2:
+        st.markdown(f"""
+        <div class="metric-box">
+            <div style="font-size:1.6rem;">🎯</div>
+            <div style="font-size:1.4rem; font-weight:700;">{confidence:.2f}%</div>
+            <div style="font-size:0.85rem; opacity:0.9;">Prediction Confidence</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # ---------------------------------
     # SHAP Explanation
     # ---------------------------------
 
     st.markdown("---")
-
     st.subheader("🧠 AI Model Explanation (SHAP)")
 
     st.dataframe(
         importance[["Feature", "Contribution"]],
         use_container_width=True
+    )
+
+    st.bar_chart(
+        importance.set_index("Feature")["Contribution"]
     )
 
     # ---------------------------------
@@ -192,11 +249,12 @@ if st.button("Predict Machine Failure"):
         reasons.append("🟢 Rotational Speed is normal")
 
     st.markdown("---")
-
     st.subheader("🛠 Engineering Interpretation")
 
-    for reason in reasons:
-        st.write(reason)
+    r1, r2 = st.columns(2)
+    for i, reason in enumerate(reasons):
+        target = r1 if i % 2 == 0 else r2
+        target.markdown(f"- {reason}")
 
     # ---------------------------------
     # Risk Level
@@ -226,7 +284,7 @@ if st.button("Predict Machine Failure"):
     )
 
     st.success("✅ Prediction saved to SQL Server successfully!")
-    # ---------------------------------
+
     # ---------------------------------
     # Generate PDF
     # ---------------------------------
@@ -249,9 +307,7 @@ if st.button("Predict Machine Failure"):
     # ---------------------------------
 
     if os.path.exists(pdf_file):
-
         with open(pdf_file, "rb") as pdf:
-
             st.download_button(
                 label="📄 Download Prediction Report",
                 data=pdf,
