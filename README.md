@@ -394,7 +394,7 @@ Generate PDF Report
 
 **Raj Patil**
 
-Petrochemical Engineer
+Chemical Engineer
 
 Machine Learning Enthusiast
 
