@@ -2,18 +2,33 @@ import pyodbc
 import pandas as pd
 
 
+# ----------------------------------------------------
+# Database Connection
+# ----------------------------------------------------
+
 def get_connection():
     """
     Create and return a SQL Server connection.
+    Returns None if SQL Server is unavailable.
     """
-    conn = pyodbc.connect(
-        "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=DESKTOP-JS0I57G\\SQLEXPRESS;"
-        "DATABASE=PredictiveMaintenanceDB;"
-        "Trusted_Connection=yes;"
-    )
-    return conn
 
+    try:
+        conn = pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+            "SERVER=DESKTOP-JS0I57G\\SQLEXPRESS;"
+            "DATABASE=PredictiveMaintenanceDB;"
+            "Trusted_Connection=yes;"
+        )
+
+        return conn
+
+    except Exception:
+        return None
+
+
+# ----------------------------------------------------
+# Save Prediction
+# ----------------------------------------------------
 
 def save_prediction(
     machine_type,
@@ -28,9 +43,15 @@ def save_prediction(
 ):
     """
     Save prediction results into SQL Server.
+    Returns True if saved successfully.
+    Returns False if SQL Server is unavailable.
     """
 
     conn = get_connection()
+
+    if conn is None:
+        return False
+
     cursor = conn.cursor()
 
     query = """
@@ -68,13 +89,23 @@ def save_prediction(
     cursor.close()
     conn.close()
 
+    return True
+
+
+# ----------------------------------------------------
+# Get Prediction History
+# ----------------------------------------------------
 
 def get_prediction_history():
     """
     Read all prediction history from SQL Server.
+    Returns an empty DataFrame if SQL Server is unavailable.
     """
 
     conn = get_connection()
+
+    if conn is None:
+        return pd.DataFrame()
 
     query = """
         SELECT *
