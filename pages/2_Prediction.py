@@ -271,20 +271,26 @@ if predict_clicked:
     # Save Prediction
     # ---------------------------------
 
-    save_prediction(
-        machine_type,
-        air_temp,
-        process_temp,
-        rot_speed,
-        torque,
-        tool_wear,
-        temp_difference,
-        prediction_text,
-        confidence
-    )
+   saved = save_prediction(
+    machine_type,
+    air_temp,
+    process_temp,
+    rot_speed,
+    torque,
+    tool_wear,
+    temp_difference,
+    prediction_text,
+    confidence
+)
 
+if saved:
     st.success("✅ Prediction saved to SQL Server successfully!")
 
+else:
+    st.info(
+        "ℹ Database is unavailable. Prediction was generated successfully, "
+        "but it was not stored."
+    )
     # ---------------------------------
     # Generate PDF
     # ---------------------------------
