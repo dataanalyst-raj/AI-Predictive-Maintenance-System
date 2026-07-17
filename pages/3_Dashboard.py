@@ -71,6 +71,21 @@ st.markdown('<div class="hero-subtitle">Live overview of machine health predicti
 # Load Data
 # ----------------------------
 df = get_prediction_history()
+# ----------------------------------------------------
+# Database Availability Check
+# ----------------------------------------------------
+
+if df.empty:
+
+    st.warning("""
+⚠ Database is unavailable.
+
+The public demo is running without SQL Server.
+
+Prediction functionality is still available.
+""")
+
+    st.stop()
 
 if df.empty:
     st.warning("No prediction data available.")
